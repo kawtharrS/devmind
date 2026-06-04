@@ -1,20 +1,3 @@
-"""
-Shared utility helpers.
-
-Responsibilities:
-  - Token counting: wrap tiktoken to count tokens for a given string and model,
-    and to split a long string into chunks that fit within a max-token budget.
-  - File filtering: given a file path, decide whether it should be indexed
-    (allowlist of extensions: .py, .js, .ts, .md, .yaml, .toml, .json, etc.)
-    and whether it should be skipped (blocklist of dirs: .git, __pycache__,
-    node_modules, .venv, dist, build).
-  - Language detection: infer the programming language from a file extension,
-    returning a short string ("python", "typescript", "markdown", …) used as
-    ChromaDB metadata.
-  - Path normalization: convert absolute paths to repo-relative paths for
-    stable chunk IDs across machines.
-"""
-
 import os
 import tiktoken
 

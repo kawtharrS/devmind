@@ -1,16 +1,3 @@
-"""
-Repository walker and file summarization module.
-
-Responsibilities:
-  - Recursively walk a git repository using GitPython, respecting .gitignore.
-  - Filter files to indexable types (source code, markdown, config) via utils.py.
-  - Read and chunk each file's content so it fits within the token budget
-    defined in config.py (uses tiktoken via utils.py for counting).
-  - Call the Anthropic API to produce a short natural-language summary of each
-    chunk, which is stored alongside the raw text in ChromaDB via store.py.
-  - Return a structured list of IndexedFile objects (path, chunks, summaries).
-"""
-
 import json
 import os
 import time

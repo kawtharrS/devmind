@@ -1,18 +1,3 @@
-"""
-Dependency and import graph extraction module.
-
-Responsibilities:
-  - Parse Python source files using the `ast` module to extract all import
-    statements (both `import X` and `from X import Y` forms).
-  - Resolve imports to local project files where possible, distinguishing
-    first-party, third-party, and stdlib dependencies.
-  - Build a directed graph (dict-of-sets or networkx DiGraph) mapping each
-    file to its dependencies.
-  - Expose helpers to query the graph: dependents of a file, transitive
-    dependencies, cycles, and an adjacency summary suitable for embedding.
-  - Serialize the graph to JSON for storage or display via the CLI.
-"""
-
 import json
 import os
 from collections import deque

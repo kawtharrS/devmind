@@ -1,20 +1,3 @@
-"""
-ChromaDB vector storage module.
-
-Responsibilities:
-  - Initialize and manage a persistent ChromaDB client pointed at the path
-    defined in config.py (CHROMA_PERSIST_DIR).
-  - Maintain two collections:
-      * "chunks"    — raw file chunks with metadata (path, line range, language).
-      * "summaries" — Claude-generated summaries of each chunk.
-  - Provide `upsert(chunks)` to add or refresh documents (keyed by file path +
-    chunk index so re-indexing is idempotent).
-  - Provide `query(text, n_results)` that embeds the query and returns the top-N
-    most relevant chunks and their metadata.
-  - Provide `delete_by_prefix(path_prefix)` to remove all chunks for a file or
-    directory when it is deleted or moved.
-"""
-
 import hashlib
 import json
 import os

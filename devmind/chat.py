@@ -1,19 +1,3 @@
-"""
-RAG query and Claude answer module.
-
-Responsibilities:
-  - Accept a natural-language question from the CLI.
-  - Query store.py to retrieve the top-N relevant code chunks and summaries.
-  - Optionally enrich context with graph.py data (e.g. dependency info for
-    files mentioned in the retrieved chunks).
-  - Build a structured prompt that includes: the retrieved context, the
-    dependency graph snippet, and the user's question.
-  - Call the Anthropic API (model configured in config.py) with the assembled
-    prompt and stream the response back to the caller.
-  - Return the final answer text and the list of source files cited, so the
-    CLI can render a Rich-formatted response with citations.
-"""
-
 import json
 
 import anthropic

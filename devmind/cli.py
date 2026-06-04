@@ -1,17 +1,3 @@
-"""
-Entry point for the devmind CLI.
-
-Defines the top-level `devmind` Click group and its subcommands:
-  - `index`       — summarize all repo files → .devmind/index.json
-  - `build-store` — embed summaries into ChromaDB → .devmind/chroma/
-  - `graph`       — extract dependency graph → .devmind/graph.json
-  - `chat`        — interactive RAG Q&A session
-  - `tour`        — print a Day 1/2/3 onboarding guide
-  - `setup`       — run index + build-store + graph in one shot
-
-All user-facing output uses Rich for formatted console rendering.
-"""
-
 import json
 import os
 import sys
