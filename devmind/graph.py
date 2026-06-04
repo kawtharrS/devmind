@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 Dependency and import graph extraction module.
 
@@ -13,12 +14,15 @@ Responsibilities:
   - Serialize the graph to JSON for storage or display via the CLI.
 """
 
+=======
+>>>>>>> ks-str
 import json
 import os
 from collections import deque
 
 
 def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | None:
+<<<<<<< HEAD
     """Return the relative_path that best matches import_string, or None.
 
     Matching strategy (tried in order, first hit wins):
@@ -26,6 +30,8 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
       2. Any path that ends with the normalised import string.
       3. Any path whose stem (no extension) ends with the import stem.
     """
+=======
+>>>>>>> ks-str
     normalised = import_string.replace("\\", "/").strip("/")
 
     # 1. Exact
@@ -38,8 +44,21 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
         if path_norm.endswith(normalised) or path_norm.endswith(normalised + ".py"):
             return path
 
+<<<<<<< HEAD
     # 3. Stem match — strip extensions from both sides
     import_stem = normalised.rstrip("/").split("/")[-1]
+=======
+    # 3. Dotted-module → path conversion ("devmind.store" → "devmind/store")
+    as_path = normalised.replace(".", "/")
+    for path in all_relative_paths:
+        path_norm = path.replace("\\", "/")
+        if path_norm.endswith(as_path) or path_norm.endswith(as_path + ".py"):
+            return path
+
+    # 4. Stem match — last component of dotted-or-slash path vs filename stem
+    #    "devmind.store" → "devmind/store" → "store" matches "store.py"
+    import_stem = as_path.split("/")[-1]
+>>>>>>> ks-str
     for path in all_relative_paths:
         path_stem = os.path.splitext(os.path.basename(path))[0]
         if path_stem == import_stem:
@@ -48,6 +67,7 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
     return None
 
 
+<<<<<<< HEAD
 def extract_dependencies(index_json_path: str) -> dict:
     """Build forward and reverse dependency graphs from an index.json file.
 
@@ -69,6 +89,9 @@ def extract_dependencies(index_json_path: str) -> dict:
     with open(index_json_path, "r", encoding="utf-8") as f:
         summaries: list[dict] = json.load(f)
 
+=======
+def build_graph(summaries: list[dict]) -> dict:
+>>>>>>> ks-str
     all_relative_paths = [s["relative_path"] for s in summaries if "relative_path" in s]
 
     forward: dict[str, list[str]] = {}
@@ -94,12 +117,26 @@ def extract_dependencies(index_json_path: str) -> dict:
         reverse=True,
     )
 
+<<<<<<< HEAD
     graph = {"forward": forward, "reverse": reverse, "core": core}
+=======
+    return {"forward": forward, "reverse": reverse, "core": core}
+
+
+def extract_dependencies(index_json_path: str) -> list[dict]:
+    index_dir = os.path.dirname(os.path.abspath(index_json_path))
+
+    with open(index_json_path, "r", encoding="utf-8") as f:
+        summaries: list[dict] = json.load(f)
+
+    graph = build_graph(summaries)
+>>>>>>> ks-str
 
     graph_path = os.path.join(index_dir, "graph.json")
     with open(graph_path, "w", encoding="utf-8") as f:
         json.dump(graph, f, indent=2)
 
+<<<<<<< HEAD
     return core
 
 
@@ -112,6 +149,12 @@ def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:
     Returns the shortest path as a list of relative_paths (inclusive of both
     endpoints), or None if no path exists.
     """
+=======
+    return graph["core"]
+
+
+def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:
+>>>>>>> ks-str
     forward = graph.get("forward", {})
 
     if start_file not in forward:

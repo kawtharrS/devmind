@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 ChromaDB vector storage module.
 
@@ -15,24 +16,72 @@ Responsibilities:
     directory when it is deleted or moved.
 """
 
+=======
+import hashlib
+>>>>>>> ks-str
 import json
 import os
 
 import chromadb
+<<<<<<< HEAD
 
 _COLLECTION_NAME = "codebase"
+=======
+import numpy as np
+
+_COLLECTION_NAME = "codebase"
+_EMBED_DIM = 1024
+
+
+class _OfflineEmbeddingFunction:
+    def name(self) -> str:
+        return "devmind-offline-hash"
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        return self(input)
+
+    def embed_documents(self, input: list[str]) -> list[list[float]]:
+        return self(input)
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        result: list[list[float]] = []
+        for text in input:
+            vec = np.zeros(_EMBED_DIM, dtype=np.float32)
+            for token in text.lower().split():
+                digest = hashlib.sha256(token.encode()).digest()
+                # Use first 8 bytes as a uint64 to index into the vector.
+                idx = int.from_bytes(digest[:8], "little") % _EMBED_DIM
+                # Use next 4 bytes for the weight so common words don't all add 1.
+                weight = 1.0 + (int.from_bytes(digest[8:12], "little") % 8) / 8.0
+                vec[idx] += weight
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec /= norm
+            result.append(vec.tolist())
+        return result
+
+
+_EF = _OfflineEmbeddingFunction()
+>>>>>>> ks-str
 
 
 def _open_collection(store_path: str) -> chromadb.Collection:
     client = chromadb.PersistentClient(path=store_path)
     return client.get_or_create_collection(
         name=_COLLECTION_NAME,
+<<<<<<< HEAD
+=======
+        embedding_function=_EF,
+>>>>>>> ks-str
         metadata={"hnsw:space": "cosine"},
     )
 
 
 def _doc_string(summary: dict) -> str:
+<<<<<<< HEAD
     """Compose the text that gets embedded for a file summary."""
+=======
+>>>>>>> ks-str
     key_fns = summary.get("key_functions") or []
     if isinstance(key_fns, list):
         key_fns = ", ".join(key_fns)
@@ -43,12 +92,16 @@ def _doc_string(summary: dict) -> str:
     )
 
 
+<<<<<<< HEAD
 def build_store(index_json_path: str, store_path: str) -> None:
     """Load index.json and upsert every file summary into ChromaDB.
 
     Documents are keyed by relative_path so re-running is idempotent.
     Metadata stored per document: path, relative_path, domain, complexity.
     """
+=======
+def build_store(index_json_path: str, store_path: str) -> int:
+>>>>>>> ks-str
     with open(index_json_path, "r", encoding="utf-8") as f:
         summaries: list[dict] = json.load(f)
 
@@ -74,6 +127,7 @@ def build_store(index_json_path: str, store_path: str) -> None:
             "purpose": summary.get("purpose", ""),
         })
 
+<<<<<<< HEAD
     if not ids:
         print("No summaries to store.")
         return
@@ -91,6 +145,15 @@ def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
 
     similarity_score is 1 - cosine_distance, so 1.0 is a perfect match.
     """
+=======
+    if ids:
+        collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
+
+    return len(ids)
+
+
+def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
+>>>>>>> ks-str
     collection = _open_collection(store_path)
 
     result = collection.query(
@@ -100,10 +163,17 @@ def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
     )
 
     hits = []
+<<<<<<< HEAD
     metadatas = result.get("metadatas", [[]])[0]
     distances = result.get("distances", [[]])[0]
 
     for meta, distance in zip(metadatas, distances):
+=======
+    metadatas_list = result.get("metadatas", [[]])[0]
+    distances = result.get("distances", [[]])[0]
+
+    for meta, distance in zip(metadatas_list, distances):
+>>>>>>> ks-str
         hits.append({
             "relative_path": meta.get("relative_path", ""),
             "purpose": meta.get("purpose", ""),

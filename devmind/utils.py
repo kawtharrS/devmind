@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 Shared utility helpers.
 
@@ -29,11 +30,18 @@ IGNORED_EXTENSIONS = {
 }
 
 MAX_LINE_COUNT = 500
+=======
+import os
+import tiktoken
+
+from devmind import config
+>>>>>>> ks-str
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def get_repo_files(repo_path: str) -> list[dict]:
+<<<<<<< HEAD
     """Walk repo_path recursively and return metadata for each indexable file.
 
     Returns a list of dicts with keys:
@@ -42,16 +50,26 @@ def get_repo_files(repo_path: str) -> list[dict]:
       extension     — lowercase file extension including the dot (e.g. ".py")
       line_count    — number of lines in the file
     """
+=======
+>>>>>>> ks-str
     results = []
     repo_path = os.path.abspath(repo_path)
 
     for dirpath, dirnames, filenames in os.walk(repo_path):
+<<<<<<< HEAD
         # Prune ignored directories in-place so os.walk won't descend into them.
         dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
 
         for filename in filenames:
             ext = os.path.splitext(filename)[1].lower()
             if ext in IGNORED_EXTENSIONS:
+=======
+        dirnames[:] = [d for d in dirnames if d not in config.IGNORED_DIRS]
+
+        for filename in filenames:
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in config.IGNORED_EXTENSIONS:
+>>>>>>> ks-str
                 continue
 
             abs_path = os.path.join(dirpath, filename)
@@ -63,27 +81,38 @@ def get_repo_files(repo_path: str) -> list[dict]:
             except OSError:
                 continue
 
+<<<<<<< HEAD
             line_count = len(lines)
             if line_count > MAX_LINE_COUNT:
+=======
+            if len(lines) > config.MAX_LINE_COUNT:
+>>>>>>> ks-str
                 continue
 
             results.append({
                 "path": abs_path,
                 "relative_path": rel_path,
                 "extension": ext,
+<<<<<<< HEAD
                 "line_count": line_count,
+=======
+                "line_count": len(lines),
+>>>>>>> ks-str
             })
 
     return results
 
 
 def chunk_file(content: str, max_tokens: int = 3000) -> list[str]:
+<<<<<<< HEAD
     """Split content into overlapping token-bounded chunks.
 
     Uses cl100k_base encoding (compatible with Claude and GPT-4).
     Overlap is 10% of max_tokens so context is preserved across chunk boundaries.
     Returns a list of decoded string chunks.
     """
+=======
+>>>>>>> ks-str
     tokens = _ENCODING.encode(content)
 
     if len(tokens) <= max_tokens:

@@ -4,3 +4,7 @@ click
 tiktoken
 rich
 gitpython
+<<<<<<< HEAD
+=======
+python-dotenv
+>>>>>>> ks-str

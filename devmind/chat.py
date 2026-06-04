@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 RAG query and Claude answer module.
 
@@ -59,6 +60,19 @@ Rules:
 - Use bullet points for multi-step flows
 - Be direct. No filler phrases."""
 
+=======
+import anthropic
+
+from devmind import config
+from devmind import prompts
+from devmind.store import search
+
+MODEL_ALIASES: dict[str, str] = {
+    "sonnet": config.SONNET_MODEL,
+    "haiku": config.HAIKU_MODEL,
+}
+
+>>>>>>> ks-str
 
 def _build_context(
     hits: list[dict],
@@ -66,7 +80,10 @@ def _build_context(
     reverse: dict[str, list[str]],
     forward: dict[str, list[str]],
 ) -> str:
+<<<<<<< HEAD
     """Assemble the context block that is injected before the question."""
+=======
+>>>>>>> ks-str
     lines: list[str] = ["--- RELEVANT FILES ---"]
 
     for hit in hits:
@@ -81,8 +98,12 @@ def _build_context(
         if isinstance(imports, list):
             imports = ", ".join(imports) if imports else "none"
 
+<<<<<<< HEAD
         rev_deps = reverse.get(rel, [])
         imported_by = ", ".join(rev_deps) if rev_deps else "nothing"
+=======
+        imported_by = ", ".join(reverse.get(rel, [])) or "nothing"
+>>>>>>> ks-str
 
         lines += [
             f"\nFile: {rel} (domain: {summary.get('domain', 'unknown')})",
@@ -109,6 +130,7 @@ def _build_context(
 def answer_question(
     question: str,
     store_path: str,
+<<<<<<< HEAD
     index_json_path: str,
     graph_json_path: str,
     client: anthropic.Anthropic,
@@ -140,24 +162,54 @@ def answer_question(
     context = _build_context(hits, summaries_by_path, reverse, forward)
 
     user_message = f"{context}\n\n--- QUESTION ---\n{question}"
+=======
+    summaries: list[dict],
+    graph: dict,
+    client: anthropic.Anthropic,
+    model: str = "sonnet",
+) -> dict:
+    resolved_model = MODEL_ALIASES.get(model, model)
+
+    hits = search(question, store_path, n_results=config.CHAT_CONTEXT_CHUNKS)
+
+    summaries_by_path = {s["relative_path"]: s for s in summaries if "relative_path" in s}
+
+    context = _build_context(
+        hits,
+        summaries_by_path,
+        graph.get("reverse", {}),
+        graph.get("forward", {}),
+    )
+>>>>>>> ks-str
 
     answer_parts: list[str] = []
     with client.messages.stream(
         model=resolved_model,
+<<<<<<< HEAD
         max_tokens=1024,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
+=======
+        max_tokens=config.CHAT_MAX_TOKENS,
+        system=prompts.CHAT_SYSTEM,
+        messages=[{"role": "user", "content": f"{context}\n\n--- QUESTION ---\n{question}"}],
+>>>>>>> ks-str
     ) as stream:
         for text in stream.text_stream:
             answer_parts.append(text)
 
     return {
         "answer": "".join(answer_parts),
+<<<<<<< HEAD
         "files_used": hit_paths,
+=======
+        "files_used": [h["relative_path"] for h in hits],
+>>>>>>> ks-str
         "model": resolved_model,
     }
 
 
+<<<<<<< HEAD
 def tour(index_json_path: str, client: anthropic.Anthropic) -> str:
     """Generate a Day 1/2/3 onboarding guide from the full index.
 
@@ -186,6 +238,19 @@ def tour(index_json_path: str, client: anthropic.Anthropic) -> str:
         model=_TOUR_MODEL,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
+=======
+def tour(summaries: list[dict], client: anthropic.Anthropic) -> str:
+    condensed = "\n".join(
+        f"- {s.get('relative_path', '?')} [{s.get('domain', 'unknown')}, {s.get('complexity', '')}]: {s.get('purpose', '')}"
+        for s in summaries
+    )
+
+    parts: list[str] = []
+    with client.messages.stream(
+        model=config.SONNET_MODEL,
+        max_tokens=config.TOUR_MAX_TOKENS,
+        messages=[{"role": "user", "content": prompts.TOUR_USER.format(summaries=condensed)}],
+>>>>>>> ks-str
     ) as stream:
         for text in stream.text_stream:
             parts.append(text)
