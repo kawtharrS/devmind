@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import sys
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -14,10 +16,10 @@ load_dotenv()
 import anthropic
 import click
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
+from rich.text import Text
 
 from devmind import config
 from devmind.chat import MODEL_ALIASES, answer_question
@@ -31,14 +33,108 @@ console = Console()
 _DEVMIND_DIR = config.DEVMIND_DIR
 _INDEX_PATH = os.path.join(_DEVMIND_DIR, "index.json")
 _GRAPH_PATH = os.path.join(_DEVMIND_DIR, "graph.json")
+_MANIFEST_PATH = os.path.join(_DEVMIND_DIR, "manifest.json")
 _STORE_PATH = os.path.join(_DEVMIND_DIR, config.CHROMA_DIR)
 
 _MODEL_CHOICES = click.Choice(list(MODEL_ALIASES.keys()))
+
+_PATH_RE = re.compile(r"\b\w[\w./\\-]*\.(?:py|js|ts|go|java|rb|rs)\b")
+_FUNC_RE = re.compile(r"\b[a-z_][a-z0-9_]*(?=\()")
+
+_BAR_WIDTH = 28
 
 
 def _load_json(path: str) -> list | dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _colorize_answer(text: str) -> Text:
+    result = Text()
+    in_code_block = False
+
+    for line in text.splitlines(keepends=True):
+        bare = line.rstrip("\n\r")
+        newline = line[len(bare):]
+
+        if bare.startswith("```"):
+            in_code_block = not in_code_block
+            result.append(line, style="dim")
+            continue
+
+        if in_code_block:
+            result.append(line, style="dim")
+            continue
+
+        if bare.startswith("### "):
+            result.append(bare[4:], style="bold dim")
+            result.append(newline)
+            continue
+        if bare.startswith("## "):
+            result.append(bare[3:], style="bold")
+            result.append(newline)
+            continue
+        if bare.startswith("# "):
+            result.append(bare[2:], style="bold underline")
+            result.append(newline)
+            continue
+
+        matches = []
+        for m in _PATH_RE.finditer(line):
+            matches.append((m.start(), m.end(), "cyan bold"))
+        for m in _FUNC_RE.finditer(line):
+            matches.append((m.start(), m.end(), "yellow"))
+        matches.sort(key=lambda x: x[0])
+
+        pos = 0
+        for start, end, style in matches:
+            if start < pos:
+                continue
+            if start > pos:
+                result.append(line[pos:start])
+            result.append(line[start:end], style=style)
+            pos = end
+        if pos < len(line):
+            result.append(line[pos:])
+
+    return result
+
+
+def _show_graph_for(target: str, graph_data: dict) -> None:
+    forward: dict = graph_data.get("forward", {})
+    reverse: dict = graph_data.get("reverse", {})
+
+    matches = [p for p in forward if target in p]
+    if not matches:
+        console.print(f"[yellow]No file matching '{target}' in graph.[/yellow]")
+        return
+
+    for path in matches:
+        imports = forward.get(path, [])
+        imported_by = reverse.get(path, [])
+
+        items = []
+        if imports:
+            items.append(("imports", imports))
+        if imported_by:
+            items.append(("imported by", imported_by))
+
+        console.print(Text(path, style="cyan bold"))
+
+        for i, (label, deps) in enumerate(items):
+            connector = "└──" if i == len(items) - 1 else "├──"
+            line = Text()
+            line.append(f"  {connector} {label}: ", style="dim")
+            for j, dep in enumerate(deps):
+                line.append(dep, style="cyan")
+                if j < len(deps) - 1:
+                    line.append(", ")
+            console.print(line)
+
+        if not items:
+            console.print("  [dim]└── (no relationships)[/dim]")
+
+        console.print()
 
 
 @click.group()
@@ -92,31 +188,63 @@ def tour(index_path: str) -> None:
     console.print("[dim]Generating onboarding guide…[/dim]")
     guide = generate_tour(summaries=summaries, client=client)
     console.print(Rule("Onboarding Guide", style="bold cyan"))
-    console.print(Markdown(guide))
+    console.print(_colorize_answer(guide))
 
 
-def _show_graph_for(target: str, graph_data: dict) -> None:
-    forward: dict = graph_data.get("forward", {})
-    reverse: dict = graph_data.get("reverse", {})
+@cli.command()
+@click.option("--output", "output_dir", default=_DEVMIND_DIR, show_default=True,
+              type=click.Path(file_okay=False, resolve_path=True),
+              help="DevMind output directory (must contain manifest.json and graph.json).")
+def stats(output_dir: str) -> None:
+    manifest_path = os.path.join(output_dir, "manifest.json")
+    graph_path = os.path.join(output_dir, "graph.json")
 
-    matches = [p for p in forward if target in p]
-    if not matches:
-        console.print(f"[yellow]No file matching '{target}' in graph.[/yellow]")
+    if not os.path.exists(manifest_path):
+        console.print("[red]No manifest found. Run `devmind setup` first.[/red]")
         return
 
-    for path in matches:
-        imports = forward.get(path, [])
-        imported_by = reverse.get(path, [])
-        table = Table(title=path, header_style="bold magenta")
-        table.add_column("Direction")
-        table.add_column("File", style="cyan")
-        for dep in imports:
-            table.add_row("imports →", dep)
-        for dep in imported_by:
-            table.add_row("← used by", dep)
-        if not imports and not imported_by:
-            table.add_row("[dim]no relationships[/dim]", "")
+    manifest: dict = _load_json(manifest_path)
+    graph_data: dict = _load_json(graph_path) if os.path.exists(graph_path) else {}
+
+    ts_raw = manifest.get("timestamp", "")
+    try:
+        ts = datetime.fromisoformat(ts_raw).strftime("%Y-%m-%d %H:%M UTC")
+    except (ValueError, AttributeError):
+        ts = ts_raw or "unknown"
+
+    cost = manifest.get("estimated_cost")
+    cost_str = f"${cost:.4f}" if cost is not None else "unavailable (re-index to capture)"
+
+    console.print(Panel(
+        f"[bold cyan]DevMind Index Stats[/bold cyan]\n"
+        f"Repo:    [dim]{manifest.get('repo_path', 'unknown')}[/dim]\n"
+        f"Indexed: [dim]{ts}[/dim]\n"
+        f"Cost:    [dim]{cost_str}[/dim]",
+        expand=False,
+    ))
+
+    console.print(f"\n[bold]Total files indexed:[/bold] {manifest.get('total_files', '?')}\n")
+
+    domain_counts: dict = manifest.get("domains_found", {})
+    if domain_counts:
+        max_count = max(domain_counts.values())
+        table = Table(title="Domain Breakdown", header_style="bold magenta")
+        table.add_column("Domain", style="cyan", min_width=12)
+        table.add_column("Files", justify="right", style="dim", min_width=5)
+        table.add_column("Distribution", min_width=_BAR_WIDTH)
+        for domain, count in sorted(domain_counts.items(), key=lambda x: -x[1]):
+            bar_len = max(1, int(count / max_count * _BAR_WIDTH))
+            table.add_row(domain, str(count), f"[green]{'█' * bar_len}[/green]")
         console.print(table)
+
+    hub_files = [e for e in graph_data.get("core", [])[:8] if e["dependents"] > 0]
+    if hub_files:
+        hub_table = Table(title="Hub Files (most depended-on)", header_style="bold magenta")
+        hub_table.add_column("File", style="cyan")
+        hub_table.add_column("Dependents", justify="right")
+        for entry in hub_files:
+            hub_table.add_row(entry["file"], str(entry["dependents"]))
+        console.print(hub_table)
 
 
 @cli.command()
@@ -151,7 +279,7 @@ def chat(store_path: str, index_path: str, graph_path: str, model: str) -> None:
 
         if user_input == "/tour":
             console.print("[dim]Generating onboarding guide…[/dim]")
-            console.print(Markdown(generate_tour(summaries=summaries, client=client)))
+            console.print(_colorize_answer(generate_tour(summaries=summaries, client=client)))
             continue
 
         if user_input.startswith("/graph"):
@@ -170,9 +298,16 @@ def chat(store_path: str, index_path: str, graph_path: str, model: str) -> None:
             client=client,
             model=model,
         )
-        console.print(Markdown(result["answer"]))
-        if result["files_used"]:
-            console.print("[dim]Sources: " + "  ·  ".join(result["files_used"]) + "[/dim]\n")
+
+        console.print(_colorize_answer(result["answer"]))
+
+        files_used = result["files_used"]
+        if files_used:
+            confidence = "[green]High confidence[/green]" if len(files_used) >= 3 else "[yellow]Partial context[/yellow]"
+            console.print("[dim]Sources: " + "  ·  ".join(files_used) + "[/dim]")
+            console.print(confidence + "\n")
+        else:
+            console.print("[red]No relevant context found[/red]\n")
 
 
 @cli.command()
@@ -203,7 +338,11 @@ def setup(repo: str, output: str) -> None:
         console.print(table)
 
     console.print(Rule("Setup complete", style="bold green"))
-    console.print("Run [bold]devmind chat[/bold] to ask questions, or [bold]devmind tour[/bold] for a guided walkthrough.")
+    console.print(
+        "Run [bold]devmind chat[/bold] to ask questions, "
+        "[bold]devmind tour[/bold] for a guided walkthrough, "
+        "or [bold]devmind stats[/bold] for an index summary."
+    )
 
 
 if __name__ == "__main__":

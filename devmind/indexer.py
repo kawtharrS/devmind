@@ -143,6 +143,8 @@ def run_indexer(repo_path: str, output_path: str) -> None:
         "domains_found": domain_counts,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "repo_path": os.path.abspath(repo_path),
+        "total_input_tokens": total_input_tokens,
+        "estimated_cost": _estimate_cost(total_input_tokens, len(summaries)),
     }
     with open(os.path.join(output_path, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
