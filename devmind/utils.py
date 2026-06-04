@@ -1,17 +1,7 @@
 import os
 import tiktoken
 
-IGNORED_DIRS = {
-    "node_modules", ".git", "__pycache__", ".venv",
-    "dist", "build", "vendor", ".next",
-}
-
-IGNORED_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".svg", ".ico",
-    ".lock", ".zip", ".env",
-}
-
-MAX_LINE_COUNT = 500
+from devmind import config
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
@@ -21,11 +11,11 @@ def get_repo_files(repo_path: str) -> list[dict]:
     repo_path = os.path.abspath(repo_path)
 
     for dirpath, dirnames, filenames in os.walk(repo_path):
-        dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
+        dirnames[:] = [d for d in dirnames if d not in config.IGNORED_DIRS]
 
         for filename in filenames:
             ext = os.path.splitext(filename)[1].lower()
-            if ext in IGNORED_EXTENSIONS:
+            if ext in config.IGNORED_EXTENSIONS:
                 continue
 
             abs_path = os.path.join(dirpath, filename)
@@ -37,15 +27,14 @@ def get_repo_files(repo_path: str) -> list[dict]:
             except OSError:
                 continue
 
-            line_count = len(lines)
-            if line_count > MAX_LINE_COUNT:
+            if len(lines) > config.MAX_LINE_COUNT:
                 continue
 
             results.append({
                 "path": abs_path,
                 "relative_path": rel_path,
                 "extension": ext,
-                "line_count": line_count,
+                "line_count": len(lines),
             })
 
     return results

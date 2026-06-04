@@ -60,7 +60,7 @@ def _doc_string(summary: dict) -> str:
     )
 
 
-def build_store(index_json_path: str, store_path: str) -> None:
+def build_store(index_json_path: str, store_path: str) -> int:
     with open(index_json_path, "r", encoding="utf-8") as f:
         summaries: list[dict] = json.load(f)
 
@@ -86,12 +86,10 @@ def build_store(index_json_path: str, store_path: str) -> None:
             "purpose": summary.get("purpose", ""),
         })
 
-    if not ids:
-        print("No summaries to store.")
-        return
+    if ids:
+        collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
 
-    collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
-    print(f"Stored {len(ids)} files in vector DB")
+    return len(ids)
 
 
 def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:

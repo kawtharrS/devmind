@@ -1,44 +1,13 @@
-import json
-
 import anthropic
 
 from devmind import config
+from devmind import prompts
 from devmind.store import search
 
 MODEL_ALIASES: dict[str, str] = {
     "sonnet": config.SONNET_MODEL,
     "haiku": config.HAIKU_MODEL,
 }
-
-_TOUR_PROMPT_TEMPLATE = """\
-Given these file summaries, generate a structured onboarding guide for a new developer.
-
-Format:
-## Day 1 — Understand the foundation
-- Read file X because: ...
-
-## Day 2 — Core business logic
-...
-
-## Day 3 — Advanced/peripheral systems
-...
-
-Be specific about WHY to read each file and what to look for.
-
-Summaries:
-{summaries}"""
-
-_SYSTEM_PROMPT = """\
-You are a senior engineer who has deeply studied this codebase.
-You help new developers understand how things work.
-
-Rules:
-- Always reference specific file paths when explaining
-- For flow questions, trace execution step by step: file → function → file
-- For 'why' questions, infer intent from naming and structure
-- If you lack context, say which files would answer the question
-- Use bullet points for multi-step flows
-- Be direct. No filler phrases."""
 
 
 def _build_context(
@@ -88,8 +57,8 @@ def _build_context(
 def answer_question(
     question: str,
     store_path: str,
-    index_json_path: str,
-    graph_json_path: str,
+    summaries: list[dict],
+    graph: dict,
     client: anthropic.Anthropic,
     model: str = "sonnet",
 ) -> dict:
@@ -97,12 +66,7 @@ def answer_question(
 
     hits = search(question, store_path, n_results=config.CHAT_CONTEXT_CHUNKS)
 
-    with open(index_json_path, "r", encoding="utf-8") as f:
-        all_summaries: list[dict] = json.load(f)
-    summaries_by_path = {s["relative_path"]: s for s in all_summaries if "relative_path" in s}
-
-    with open(graph_json_path, "r", encoding="utf-8") as f:
-        graph = json.load(f)
+    summaries_by_path = {s["relative_path"]: s for s in summaries if "relative_path" in s}
 
     context = _build_context(
         hits,
@@ -115,7 +79,7 @@ def answer_question(
     with client.messages.stream(
         model=resolved_model,
         max_tokens=config.CHAT_MAX_TOKENS,
-        system=_SYSTEM_PROMPT,
+        system=prompts.CHAT_SYSTEM,
         messages=[{"role": "user", "content": f"{context}\n\n--- QUESTION ---\n{question}"}],
     ) as stream:
         for text in stream.text_stream:
@@ -128,20 +92,17 @@ def answer_question(
     }
 
 
-def tour(index_json_path: str, client: anthropic.Anthropic) -> str:
-    with open(index_json_path, "r", encoding="utf-8") as f:
-        all_summaries: list[dict] = json.load(f)
-
+def tour(summaries: list[dict], client: anthropic.Anthropic) -> str:
     condensed = "\n".join(
         f"- {s.get('relative_path', '?')} [{s.get('domain', 'unknown')}, {s.get('complexity', '')}]: {s.get('purpose', '')}"
-        for s in all_summaries
+        for s in summaries
     )
 
     parts: list[str] = []
     with client.messages.stream(
         model=config.SONNET_MODEL,
         max_tokens=config.TOUR_MAX_TOKENS,
-        messages=[{"role": "user", "content": _TOUR_PROMPT_TEMPLATE.format(summaries=condensed)}],
+        messages=[{"role": "user", "content": prompts.TOUR_USER.format(summaries=condensed)}],
     ) as stream:
         for text in stream.text_stream:
             parts.append(text)

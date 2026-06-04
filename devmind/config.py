@@ -14,3 +14,12 @@ CHAT_CONTEXT_CHUNKS = 5
 INPUT_COST_PER_M = 0.80
 OUTPUT_COST_PER_M = 4.00
 AVG_SUMMARY_OUTPUT_TOKENS = 150
+
+IGNORED_DIRS = {
+    "node_modules", ".git", "__pycache__", ".venv",
+    "dist", "build", "vendor", ".next",
+}
+IGNORED_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".svg", ".ico",
+    ".lock", ".zip", ".env",
+}

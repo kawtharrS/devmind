@@ -34,12 +34,7 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
     return None
 
 
-def extract_dependencies(index_json_path: str) -> dict:
-    index_dir = os.path.dirname(os.path.abspath(index_json_path))
-
-    with open(index_json_path, "r", encoding="utf-8") as f:
-        summaries: list[dict] = json.load(f)
-
+def build_graph(summaries: list[dict]) -> dict:
     all_relative_paths = [s["relative_path"] for s in summaries if "relative_path" in s]
 
     forward: dict[str, list[str]] = {}
@@ -65,13 +60,22 @@ def extract_dependencies(index_json_path: str) -> dict:
         reverse=True,
     )
 
-    graph = {"forward": forward, "reverse": reverse, "core": core}
+    return {"forward": forward, "reverse": reverse, "core": core}
+
+
+def extract_dependencies(index_json_path: str) -> list[dict]:
+    index_dir = os.path.dirname(os.path.abspath(index_json_path))
+
+    with open(index_json_path, "r", encoding="utf-8") as f:
+        summaries: list[dict] = json.load(f)
+
+    graph = build_graph(summaries)
 
     graph_path = os.path.join(index_dir, "graph.json")
     with open(graph_path, "w", encoding="utf-8") as f:
         json.dump(graph, f, indent=2)
 
-    return core
+    return graph["core"]
 
 
 def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:

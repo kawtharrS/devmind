@@ -36,6 +36,11 @@ _STORE_PATH = os.path.join(_DEVMIND_DIR, config.CHROMA_DIR)
 _MODEL_CHOICES = click.Choice(list(MODEL_ALIASES.keys()))
 
 
+def _load_json(path: str) -> list | dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 @click.group()
 def cli():
     pass
@@ -52,7 +57,8 @@ def index(repo: str, output: str) -> None:
 @click.option("--index", "index_path", default=_INDEX_PATH, show_default=True, type=click.Path(exists=True, dir_okay=False, resolve_path=True), help="Path to index.json.")
 @click.option("--store", "store_path", default=_STORE_PATH, show_default=True, type=click.Path(file_okay=False, resolve_path=True), help="Directory where ChromaDB persists its data.")
 def build_store_cmd(index_path: str, store_path: str) -> None:
-    build_store(index_json_path=index_path, store_path=store_path)
+    count = build_store(index_json_path=index_path, store_path=store_path)
+    console.print(f"[green]Stored {count} files in vector DB[/green]")
 
 
 @cli.command()
@@ -82,8 +88,9 @@ def graph(index_path: str, top: int) -> None:
 @click.option("--index", "index_path", default=_INDEX_PATH, show_default=True, type=click.Path(exists=True, dir_okay=False, resolve_path=True), help="Path to index.json.")
 def tour(index_path: str) -> None:
     client = anthropic.Anthropic()
+    summaries: list[dict] = _load_json(index_path)
     console.print("[dim]Generating onboarding guide…[/dim]")
-    guide = generate_tour(index_json_path=index_path, client=client)
+    guide = generate_tour(summaries=summaries, client=client)
     console.print(Rule("Onboarding Guide", style="bold cyan"))
     console.print(Markdown(guide))
 
@@ -119,9 +126,8 @@ def _show_graph_for(target: str, graph_data: dict) -> None:
 @click.option("--model", default="sonnet", show_default=True, type=_MODEL_CHOICES, help="'sonnet' (~$0.003/question) or 'haiku' (~$0.0003/question) for cheap testing.")
 def chat(store_path: str, index_path: str, graph_path: str, model: str) -> None:
     client = anthropic.Anthropic()
-
-    with open(graph_path, "r", encoding="utf-8") as f:
-        graph_data = json.load(f)
+    summaries: list[dict] = _load_json(index_path)
+    graph_data: dict = _load_json(graph_path)
 
     console.print(Panel(
         f"[bold cyan]DevMind[/bold cyan] — Ask anything about this codebase\n"
@@ -145,7 +151,7 @@ def chat(store_path: str, index_path: str, graph_path: str, model: str) -> None:
 
         if user_input == "/tour":
             console.print("[dim]Generating onboarding guide…[/dim]")
-            console.print(Markdown(generate_tour(index_json_path=index_path, client=client)))
+            console.print(Markdown(generate_tour(summaries=summaries, client=client)))
             continue
 
         if user_input.startswith("/graph"):
@@ -159,8 +165,8 @@ def chat(store_path: str, index_path: str, graph_path: str, model: str) -> None:
         result = answer_question(
             question=user_input,
             store_path=store_path,
-            index_json_path=index_path,
-            graph_json_path=graph_path,
+            summaries=summaries,
+            graph=graph_data,
             client=client,
             model=model,
         )
@@ -180,7 +186,8 @@ def setup(repo: str, output: str) -> None:
     run_indexer(repo_path=repo, output_path=output)
 
     console.print(Rule("Step 2 / 3 — Building vector store", style="bold blue"))
-    build_store(index_json_path=index_json, store_path=store_dir)
+    count = build_store(index_json_path=index_json, store_path=store_dir)
+    console.print(f"[green]Stored {count} files in vector DB[/green]")
 
     console.print(Rule("Step 3 / 3 — Extracting dependency graph", style="bold blue"))
     core = extract_dependencies(index_json)

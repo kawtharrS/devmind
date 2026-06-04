@@ -11,29 +11,10 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, T
 from rich.table import Table
 
 from devmind import config
+from devmind import prompts
 from devmind.utils import chunk_file, get_repo_files
 
 console = Console()
-
-SYSTEM_PROMPT = (
-    "You are a senior software engineer analyzing a codebase. "
-    "Be concise and precise. Never repeat the filename."
-)
-
-USER_PROMPT_TEMPLATE = """\
-Analyze this file and return ONLY a JSON object with these fields:
-- purpose: one sentence describing what this file does
-- key_functions: list of the 3-5 most important functions/classes/exports
-- imports: list of internal imports (other project files it depends on)
-- exports: list of what this file exposes to the rest of the codebase
-- domain: one word category (auth, payments, routing, database, ui, config, utils, etc)
-- complexity: low/medium/high
-
-File path: {relative_path}
-Content:
-{content}
-
-Return ONLY the JSON, no markdown, no explanation."""
 
 _FALLBACK = {
     "purpose": "parse error",
@@ -45,6 +26,12 @@ _FALLBACK = {
 }
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
+
+
+def _estimate_cost(total_input_tokens: int, file_count: int) -> float:
+    est_input = (total_input_tokens / 1_000_000) * config.INPUT_COST_PER_M
+    est_output = (file_count * config.AVG_SUMMARY_OUTPUT_TOKENS / 1_000_000) * config.OUTPUT_COST_PER_M
+    return est_input + est_output
 
 
 def _parse_summary(raw: str) -> dict | None:
@@ -76,13 +63,13 @@ def summarize_file(
         except OSError as exc:
             return {**_FALLBACK, "purpose": f"read error: {exc}", "path": file_path, "relative_path": relative_path}
 
-    user_prompt = USER_PROMPT_TEMPLATE.format(relative_path=relative_path, content=content)
+    user_prompt = prompts.INDEXER_USER.format(relative_path=relative_path, content=content)
 
     try:
         message = client.messages.create(
             model=config.HAIKU_MODEL,
             max_tokens=config.SUMMARIZE_MAX_TOKENS,
-            system=SYSTEM_PROMPT,
+            system=prompts.INDEXER_SYSTEM,
             messages=[{"role": "user", "content": user_prompt}],
         )
     except anthropic.APIError as exc:
@@ -160,9 +147,6 @@ def run_indexer(repo_path: str, output_path: str) -> None:
     with open(os.path.join(output_path, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    est_input_cost = (total_input_tokens / 1_000_000) * config.INPUT_COST_PER_M
-    est_output_cost = (len(summaries) * config.AVG_SUMMARY_OUTPUT_TOKENS / 1_000_000) * config.OUTPUT_COST_PER_M
-
     table = Table(title="Indexing Complete", show_header=True, header_style="bold magenta")
     table.add_column("Domain", style="cyan")
     table.add_column("Files", justify="right")
@@ -174,6 +158,6 @@ def run_indexer(repo_path: str, output_path: str) -> None:
     console.print(table)
     console.print(f"[green]Index written to:[/green] {index_path}")
     console.print(
-        f"[dim]Estimated cost: ${est_input_cost + est_output_cost:.4f} "
+        f"[dim]Estimated cost: ${_estimate_cost(total_input_tokens, len(summaries)):.4f} "
         f"({total_input_tokens:,} input tokens × {len(summaries)} files)[/dim]"
     )
