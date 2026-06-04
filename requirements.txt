@@ -1,0 +1,6 @@
+anthropic
+chromadb
+click
+tiktoken
+rich
+gitpython
