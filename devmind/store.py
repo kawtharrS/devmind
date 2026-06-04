@@ -15,18 +15,64 @@ Responsibilities:
     directory when it is deleted or moved.
 """
 
+import hashlib
 import json
 import os
 
 import chromadb
+import numpy as np
 
 _COLLECTION_NAME = "codebase"
+_EMBED_DIM = 1024
+
+
+class _OfflineEmbeddingFunction:
+    """Bag-of-words hash embedding — works offline, no model download needed.
+
+    Uses the hashing trick: each whitespace-delimited token is hashed into a
+    fixed-length float vector, then L2-normalised so cosine distance is valid.
+    Consistent across runs because SHA-256 is deterministic.
+
+    Tradeoff vs semantic embeddings: synonym/paraphrase matching is weaker,
+    but for codebases with consistent terminology (function names, domain words)
+    the retrieval quality is sufficient.
+    """
+
+    def name(self) -> str:
+        return "devmind-offline-hash"
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        return self(input)
+
+    def embed_documents(self, input: list[str]) -> list[list[float]]:
+        return self(input)
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        result: list[list[float]] = []
+        for text in input:
+            vec = np.zeros(_EMBED_DIM, dtype=np.float32)
+            for token in text.lower().split():
+                digest = hashlib.sha256(token.encode()).digest()
+                # Use first 8 bytes as a uint64 to index into the vector.
+                idx = int.from_bytes(digest[:8], "little") % _EMBED_DIM
+                # Use next 4 bytes for the weight so common words don't all add 1.
+                weight = 1.0 + (int.from_bytes(digest[8:12], "little") % 8) / 8.0
+                vec[idx] += weight
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec /= norm
+            result.append(vec.tolist())
+        return result
+
+
+_EF = _OfflineEmbeddingFunction()
 
 
 def _open_collection(store_path: str) -> chromadb.Collection:
     client = chromadb.PersistentClient(path=store_path)
     return client.get_or_create_collection(
         name=_COLLECTION_NAME,
+        embedding_function=_EF,
         metadata={"hnsw:space": "cosine"},
     )
 
@@ -100,10 +146,10 @@ def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
     )
 
     hits = []
-    metadatas = result.get("metadatas", [[]])[0]
+    metadatas_list = result.get("metadatas", [[]])[0]
     distances = result.get("distances", [[]])[0]
 
-    for meta, distance in zip(metadatas, distances):
+    for meta, distance in zip(metadatas_list, distances):
         hits.append({
             "relative_path": meta.get("relative_path", ""),
             "purpose": meta.get("purpose", ""),

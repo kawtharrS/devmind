@@ -38,8 +38,16 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
         if path_norm.endswith(normalised) or path_norm.endswith(normalised + ".py"):
             return path
 
-    # 3. Stem match — strip extensions from both sides
-    import_stem = normalised.rstrip("/").split("/")[-1]
+    # 3. Dotted-module → path conversion ("devmind.store" → "devmind/store")
+    as_path = normalised.replace(".", "/")
+    for path in all_relative_paths:
+        path_norm = path.replace("\\", "/")
+        if path_norm.endswith(as_path) or path_norm.endswith(as_path + ".py"):
+            return path
+
+    # 4. Stem match — last component of dotted-or-slash path vs filename stem
+    #    "devmind.store" → "devmind/store" → "store" matches "store.py"
+    import_stem = as_path.split("/")[-1]
     for path in all_relative_paths:
         path_stem = os.path.splitext(os.path.basename(path))[0]
         if path_stem == import_stem:

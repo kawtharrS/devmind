@@ -4,3 +4,4 @@ click
 tiktoken
 rich
 gitpython
+python-dotenv

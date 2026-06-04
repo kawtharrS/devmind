@@ -14,6 +14,18 @@ All user-facing output uses Rich for formatted console rendering.
 
 import json
 import os
+import sys
+
+from dotenv import load_dotenv
+
+# Force UTF-8 on Windows so Rich's Unicode output (─, ×, →, etc.) isn't mangled.
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# Load .env from project root or devmind/ subdirectory, whichever exists first.
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv()  # fallback: project root
 
 import anthropic
 import click
