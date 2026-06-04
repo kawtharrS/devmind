@@ -2,14 +2,13 @@ import json
 
 import anthropic
 
+from devmind import config
 from devmind.store import search
 
 MODEL_ALIASES: dict[str, str] = {
-    "sonnet": "claude-sonnet-4-6",
-    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": config.SONNET_MODEL,
+    "haiku": config.HAIKU_MODEL,
 }
-
-_TOUR_MODEL = "claude-sonnet-4-6"
 
 _TOUR_PROMPT_TEMPLATE = """\
 Given these file summaries, generate a structured onboarding guide for a new developer.
@@ -28,8 +27,6 @@ Be specific about WHY to read each file and what to look for.
 
 Summaries:
 {summaries}"""
-
-_MODEL = "claude-sonnet-4-6"
 
 _SYSTEM_PROMPT = """\
 You are a senior engineer who has deeply studied this codebase.
@@ -50,7 +47,6 @@ def _build_context(
     reverse: dict[str, list[str]],
     forward: dict[str, list[str]],
 ) -> str:
-    """Assemble the context block that is injected before the question."""
     lines: list[str] = ["--- RELEVANT FILES ---"]
 
     for hit in hits:
@@ -65,8 +61,7 @@ def _build_context(
         if isinstance(imports, list):
             imports = ", ".join(imports) if imports else "none"
 
-        rev_deps = reverse.get(rel, [])
-        imported_by = ", ".join(rev_deps) if rev_deps else "nothing"
+        imported_by = ", ".join(reverse.get(rel, [])) or "nothing"
 
         lines += [
             f"\nFile: {rel} (domain: {summary.get('domain', 'unknown')})",
@@ -98,19 +93,9 @@ def answer_question(
     client: anthropic.Anthropic,
     model: str = "sonnet",
 ) -> dict:
-    """Run RAG over the codebase index and return a Claude-powered answer.
-
-    model accepts an alias ("sonnet" or "haiku") or a full model ID.
-
-    Returns:
-      answer      — full text of the model's response
-      files_used  — list of relative_paths surfaced as context
-      model       — resolved model ID used
-    """
     resolved_model = MODEL_ALIASES.get(model, model)
 
-    hits = search(question, store_path, n_results=5)
-    hit_paths = [h["relative_path"] for h in hits]
+    hits = search(question, store_path, n_results=config.CHAT_CONTEXT_CHUNKS)
 
     with open(index_json_path, "r", encoding="utf-8") as f:
         all_summaries: list[dict] = json.load(f)
@@ -118,58 +103,45 @@ def answer_question(
 
     with open(graph_json_path, "r", encoding="utf-8") as f:
         graph = json.load(f)
-    forward: dict[str, list[str]] = graph.get("forward", {})
-    reverse: dict[str, list[str]] = graph.get("reverse", {})
 
-    context = _build_context(hits, summaries_by_path, reverse, forward)
-
-    user_message = f"{context}\n\n--- QUESTION ---\n{question}"
+    context = _build_context(
+        hits,
+        summaries_by_path,
+        graph.get("reverse", {}),
+        graph.get("forward", {}),
+    )
 
     answer_parts: list[str] = []
     with client.messages.stream(
         model=resolved_model,
-        max_tokens=1024,
+        max_tokens=config.CHAT_MAX_TOKENS,
         system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
+        messages=[{"role": "user", "content": f"{context}\n\n--- QUESTION ---\n{question}"}],
     ) as stream:
         for text in stream.text_stream:
             answer_parts.append(text)
 
     return {
         "answer": "".join(answer_parts),
-        "files_used": hit_paths,
+        "files_used": [h["relative_path"] for h in hits],
         "model": resolved_model,
     }
 
 
 def tour(index_json_path: str, client: anthropic.Anthropic) -> str:
-    """Generate a Day 1/2/3 onboarding guide from the full index.
-
-    Condenses each summary to a single line (path, domain, purpose) to stay
-    within the context budget while giving the model enough signal to order
-    files by conceptual importance.
-
-    Returns the guide as a markdown string.
-    """
     with open(index_json_path, "r", encoding="utf-8") as f:
         all_summaries: list[dict] = json.load(f)
 
-    condensed_lines: list[str] = []
-    for s in all_summaries:
-        rel = s.get("relative_path", "?")
-        domain = s.get("domain", "unknown")
-        purpose = s.get("purpose", "")
-        complexity = s.get("complexity", "")
-        condensed_lines.append(f"- {rel} [{domain}, {complexity}]: {purpose}")
-
-    condensed = "\n".join(condensed_lines)
-    prompt = _TOUR_PROMPT_TEMPLATE.format(summaries=condensed)
+    condensed = "\n".join(
+        f"- {s.get('relative_path', '?')} [{s.get('domain', 'unknown')}, {s.get('complexity', '')}]: {s.get('purpose', '')}"
+        for s in all_summaries
+    )
 
     parts: list[str] = []
     with client.messages.stream(
-        model=_TOUR_MODEL,
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
+        model=config.SONNET_MODEL,
+        max_tokens=config.TOUR_MAX_TOKENS,
+        messages=[{"role": "user", "content": _TOUR_PROMPT_TEMPLATE.format(summaries=condensed)}],
     ) as stream:
         for text in stream.text_stream:
             parts.append(text)

@@ -17,19 +17,10 @@ _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def get_repo_files(repo_path: str) -> list[dict]:
-    """Walk repo_path recursively and return metadata for each indexable file.
-
-    Returns a list of dicts with keys:
-      path          — absolute path to the file
-      relative_path — path relative to repo_path
-      extension     — lowercase file extension including the dot (e.g. ".py")
-      line_count    — number of lines in the file
-    """
     results = []
     repo_path = os.path.abspath(repo_path)
 
     for dirpath, dirnames, filenames in os.walk(repo_path):
-        # Prune ignored directories in-place so os.walk won't descend into them.
         dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
 
         for filename in filenames:
@@ -61,12 +52,6 @@ def get_repo_files(repo_path: str) -> list[dict]:
 
 
 def chunk_file(content: str, max_tokens: int = 3000) -> list[str]:
-    """Split content into overlapping token-bounded chunks.
-
-    Uses cl100k_base encoding (compatible with Claude and GPT-4).
-    Overlap is 10% of max_tokens so context is preserved across chunk boundaries.
-    Returns a list of decoded string chunks.
-    """
     tokens = _ENCODING.encode(content)
 
     if len(tokens) <= max_tokens:

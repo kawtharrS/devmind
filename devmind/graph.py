@@ -4,13 +4,6 @@ from collections import deque
 
 
 def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | None:
-    """Return the relative_path that best matches import_string, or None.
-
-    Matching strategy (tried in order, first hit wins):
-      1. Exact match after normalising separators.
-      2. Any path that ends with the normalised import string.
-      3. Any path whose stem (no extension) ends with the import stem.
-    """
     normalised = import_string.replace("\\", "/").strip("/")
 
     # 1. Exact
@@ -42,21 +35,6 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
 
 
 def extract_dependencies(index_json_path: str) -> dict:
-    """Build forward and reverse dependency graphs from an index.json file.
-
-    Loads the summaries produced by indexer.run_indexer, fuzzy-matches each
-    entry's "imports" list against known relative_paths, and writes a
-    graph.json next to the index.
-
-    graph.json schema:
-      {
-        "forward":  { relative_path: [relative_paths it imports] },
-        "reverse":  { relative_path: [relative_paths that import it] },
-        "core":     [ {file, dependents} ] sorted descending by dependent count
-      }
-
-    Returns the core list so callers can surface the most-imported files.
-    """
     index_dir = os.path.dirname(os.path.abspath(index_json_path))
 
     with open(index_json_path, "r", encoding="utf-8") as f:
@@ -97,14 +75,6 @@ def extract_dependencies(index_json_path: str) -> dict:
 
 
 def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:
-    """BFS over the forward dependency graph from start_file to end_file.
-
-    graph must be a dict with a "forward" key mapping each file to its imports,
-    as produced by extract_dependencies.
-
-    Returns the shortest path as a list of relative_paths (inclusive of both
-    endpoints), or None if no path exists.
-    """
     forward = graph.get("forward", {})
 
     if start_file not in forward:

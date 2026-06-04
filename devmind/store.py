@@ -10,17 +10,6 @@ _EMBED_DIM = 1024
 
 
 class _OfflineEmbeddingFunction:
-    """Bag-of-words hash embedding — works offline, no model download needed.
-
-    Uses the hashing trick: each whitespace-delimited token is hashed into a
-    fixed-length float vector, then L2-normalised so cosine distance is valid.
-    Consistent across runs because SHA-256 is deterministic.
-
-    Tradeoff vs semantic embeddings: synonym/paraphrase matching is weaker,
-    but for codebases with consistent terminology (function names, domain words)
-    the retrieval quality is sufficient.
-    """
-
     def name(self) -> str:
         return "devmind-offline-hash"
 
@@ -61,7 +50,6 @@ def _open_collection(store_path: str) -> chromadb.Collection:
 
 
 def _doc_string(summary: dict) -> str:
-    """Compose the text that gets embedded for a file summary."""
     key_fns = summary.get("key_functions") or []
     if isinstance(key_fns, list):
         key_fns = ", ".join(key_fns)
@@ -73,11 +61,6 @@ def _doc_string(summary: dict) -> str:
 
 
 def build_store(index_json_path: str, store_path: str) -> None:
-    """Load index.json and upsert every file summary into ChromaDB.
-
-    Documents are keyed by relative_path so re-running is idempotent.
-    Metadata stored per document: path, relative_path, domain, complexity.
-    """
     with open(index_json_path, "r", encoding="utf-8") as f:
         summaries: list[dict] = json.load(f)
 
@@ -107,19 +90,11 @@ def build_store(index_json_path: str, store_path: str) -> None:
         print("No summaries to store.")
         return
 
-    # Upsert in one batch; ChromaDB handles adds and updates transparently.
     collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
     print(f"Stored {len(ids)} files in vector DB")
 
 
 def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
-    """Semantic search over the codebase collection.
-
-    Returns up to n_results dicts, each with:
-      relative_path, purpose, domain, similarity_score
-
-    similarity_score is 1 - cosine_distance, so 1.0 is a perfect match.
-    """
     collection = _open_collection(store_path)
 
     result = collection.query(
