@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "devmind": {
+      "command": "py",
+      "args": ["-3.11", "-m", "devmind.mcp_server"],
+      "env": {
+        "DEVMIND_PATH": "C:\\Users\\user\\Desktop\\dev-onboarding-ai\\.devmind"
+      }
+    }
+  }
+}

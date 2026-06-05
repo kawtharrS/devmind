@@ -1,75 +1,21 @@
-<<<<<<< HEAD
-"""
-Shared utility helpers.
-
-Responsibilities:
-  - Token counting: wrap tiktoken to count tokens for a given string and model,
-    and to split a long string into chunks that fit within a max-token budget.
-  - File filtering: given a file path, decide whether it should be indexed
-    (allowlist of extensions: .py, .js, .ts, .md, .yaml, .toml, .json, etc.)
-    and whether it should be skipped (blocklist of dirs: .git, __pycache__,
-    node_modules, .venv, dist, build).
-  - Language detection: infer the programming language from a file extension,
-    returning a short string ("python", "typescript", "markdown", …) used as
-    ChromaDB metadata.
-  - Path normalization: convert absolute paths to repo-relative paths for
-    stable chunk IDs across machines.
-"""
-
-import os
-import tiktoken
-
-IGNORED_DIRS = {
-    "node_modules", ".git", "__pycache__", ".venv",
-    "dist", "build", "vendor", ".next",
-}
-
-IGNORED_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".svg", ".ico",
-    ".lock", ".zip", ".env",
-}
-
-MAX_LINE_COUNT = 500
-=======
 import os
 import tiktoken
 
 from devmind import config
->>>>>>> ks-str
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def get_repo_files(repo_path: str) -> list[dict]:
-<<<<<<< HEAD
-    """Walk repo_path recursively and return metadata for each indexable file.
-
-    Returns a list of dicts with keys:
-      path          — absolute path to the file
-      relative_path — path relative to repo_path
-      extension     — lowercase file extension including the dot (e.g. ".py")
-      line_count    — number of lines in the file
-    """
-=======
->>>>>>> ks-str
     results = []
     repo_path = os.path.abspath(repo_path)
 
     for dirpath, dirnames, filenames in os.walk(repo_path):
-<<<<<<< HEAD
-        # Prune ignored directories in-place so os.walk won't descend into them.
-        dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
-
-        for filename in filenames:
-            ext = os.path.splitext(filename)[1].lower()
-            if ext in IGNORED_EXTENSIONS:
-=======
         dirnames[:] = [d for d in dirnames if d not in config.IGNORED_DIRS]
 
         for filename in filenames:
             ext = os.path.splitext(filename)[1].lower()
             if ext in config.IGNORED_EXTENSIONS:
->>>>>>> ks-str
                 continue
 
             abs_path = os.path.join(dirpath, filename)
@@ -81,38 +27,20 @@ def get_repo_files(repo_path: str) -> list[dict]:
             except OSError:
                 continue
 
-<<<<<<< HEAD
-            line_count = len(lines)
-            if line_count > MAX_LINE_COUNT:
-=======
             if len(lines) > config.MAX_LINE_COUNT:
->>>>>>> ks-str
                 continue
 
             results.append({
                 "path": abs_path,
                 "relative_path": rel_path,
                 "extension": ext,
-<<<<<<< HEAD
-                "line_count": line_count,
-=======
                 "line_count": len(lines),
->>>>>>> ks-str
             })
 
     return results
 
 
 def chunk_file(content: str, max_tokens: int = 3000) -> list[str]:
-<<<<<<< HEAD
-    """Split content into overlapping token-bounded chunks.
-
-    Uses cl100k_base encoding (compatible with Claude and GPT-4).
-    Overlap is 10% of max_tokens so context is preserved across chunk boundaries.
-    Returns a list of decoded string chunks.
-    """
-=======
->>>>>>> ks-str
     tokens = _ENCODING.encode(content)
 
     if len(tokens) <= max_tokens:

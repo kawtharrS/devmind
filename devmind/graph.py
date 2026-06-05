@@ -1,37 +1,9 @@
-<<<<<<< HEAD
-"""
-Dependency and import graph extraction module.
-
-Responsibilities:
-  - Parse Python source files using the `ast` module to extract all import
-    statements (both `import X` and `from X import Y` forms).
-  - Resolve imports to local project files where possible, distinguishing
-    first-party, third-party, and stdlib dependencies.
-  - Build a directed graph (dict-of-sets or networkx DiGraph) mapping each
-    file to its dependencies.
-  - Expose helpers to query the graph: dependents of a file, transitive
-    dependencies, cycles, and an adjacency summary suitable for embedding.
-  - Serialize the graph to JSON for storage or display via the CLI.
-"""
-
-=======
->>>>>>> ks-str
 import json
 import os
 from collections import deque
 
 
 def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | None:
-<<<<<<< HEAD
-    """Return the relative_path that best matches import_string, or None.
-
-    Matching strategy (tried in order, first hit wins):
-      1. Exact match after normalising separators.
-      2. Any path that ends with the normalised import string.
-      3. Any path whose stem (no extension) ends with the import stem.
-    """
-=======
->>>>>>> ks-str
     normalised = import_string.replace("\\", "/").strip("/")
 
     # 1. Exact
@@ -44,10 +16,6 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
         if path_norm.endswith(normalised) or path_norm.endswith(normalised + ".py"):
             return path
 
-<<<<<<< HEAD
-    # 3. Stem match — strip extensions from both sides
-    import_stem = normalised.rstrip("/").split("/")[-1]
-=======
     # 3. Dotted-module → path conversion ("devmind.store" → "devmind/store")
     as_path = normalised.replace(".", "/")
     for path in all_relative_paths:
@@ -58,7 +26,6 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
     # 4. Stem match — last component of dotted-or-slash path vs filename stem
     #    "devmind.store" → "devmind/store" → "store" matches "store.py"
     import_stem = as_path.split("/")[-1]
->>>>>>> ks-str
     for path in all_relative_paths:
         path_stem = os.path.splitext(os.path.basename(path))[0]
         if path_stem == import_stem:
@@ -67,31 +34,7 @@ def _fuzzy_match(import_string: str, all_relative_paths: list[str]) -> str | Non
     return None
 
 
-<<<<<<< HEAD
-def extract_dependencies(index_json_path: str) -> dict:
-    """Build forward and reverse dependency graphs from an index.json file.
-
-    Loads the summaries produced by indexer.run_indexer, fuzzy-matches each
-    entry's "imports" list against known relative_paths, and writes a
-    graph.json next to the index.
-
-    graph.json schema:
-      {
-        "forward":  { relative_path: [relative_paths it imports] },
-        "reverse":  { relative_path: [relative_paths that import it] },
-        "core":     [ {file, dependents} ] sorted descending by dependent count
-      }
-
-    Returns the core list so callers can surface the most-imported files.
-    """
-    index_dir = os.path.dirname(os.path.abspath(index_json_path))
-
-    with open(index_json_path, "r", encoding="utf-8") as f:
-        summaries: list[dict] = json.load(f)
-
-=======
 def build_graph(summaries: list[dict]) -> dict:
->>>>>>> ks-str
     all_relative_paths = [s["relative_path"] for s in summaries if "relative_path" in s]
 
     forward: dict[str, list[str]] = {}
@@ -117,9 +60,6 @@ def build_graph(summaries: list[dict]) -> dict:
         reverse=True,
     )
 
-<<<<<<< HEAD
-    graph = {"forward": forward, "reverse": reverse, "core": core}
-=======
     return {"forward": forward, "reverse": reverse, "core": core}
 
 
@@ -130,31 +70,15 @@ def extract_dependencies(index_json_path: str) -> list[dict]:
         summaries: list[dict] = json.load(f)
 
     graph = build_graph(summaries)
->>>>>>> ks-str
 
     graph_path = os.path.join(index_dir, "graph.json")
     with open(graph_path, "w", encoding="utf-8") as f:
         json.dump(graph, f, indent=2)
 
-<<<<<<< HEAD
-    return core
-
-
-def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:
-    """BFS over the forward dependency graph from start_file to end_file.
-
-    graph must be a dict with a "forward" key mapping each file to its imports,
-    as produced by extract_dependencies.
-
-    Returns the shortest path as a list of relative_paths (inclusive of both
-    endpoints), or None if no path exists.
-    """
-=======
     return graph["core"]
 
 
 def find_path(graph: dict, start_file: str, end_file: str) -> list[str] | None:
->>>>>>> ks-str
     forward = graph.get("forward", {})
 
     if start_file not in forward:
