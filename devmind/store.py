@@ -1,32 +1,8 @@
-<<<<<<< HEAD
-"""
-ChromaDB vector storage module.
-
-Responsibilities:
-  - Initialize and manage a persistent ChromaDB client pointed at the path
-    defined in config.py (CHROMA_PERSIST_DIR).
-  - Maintain two collections:
-      * "chunks"    — raw file chunks with metadata (path, line range, language).
-      * "summaries" — Claude-generated summaries of each chunk.
-  - Provide `upsert(chunks)` to add or refresh documents (keyed by file path +
-    chunk index so re-indexing is idempotent).
-  - Provide `query(text, n_results)` that embeds the query and returns the top-N
-    most relevant chunks and their metadata.
-  - Provide `delete_by_prefix(path_prefix)` to remove all chunks for a file or
-    directory when it is deleted or moved.
-"""
-
-=======
 import hashlib
->>>>>>> ks-str
 import json
 import os
 
 import chromadb
-<<<<<<< HEAD
-
-_COLLECTION_NAME = "codebase"
-=======
 import numpy as np
 
 _COLLECTION_NAME = "codebase"
@@ -62,26 +38,18 @@ class _OfflineEmbeddingFunction:
 
 
 _EF = _OfflineEmbeddingFunction()
->>>>>>> ks-str
 
 
 def _open_collection(store_path: str) -> chromadb.Collection:
     client = chromadb.PersistentClient(path=store_path)
     return client.get_or_create_collection(
         name=_COLLECTION_NAME,
-<<<<<<< HEAD
-=======
         embedding_function=_EF,
->>>>>>> ks-str
         metadata={"hnsw:space": "cosine"},
     )
 
 
 def _doc_string(summary: dict) -> str:
-<<<<<<< HEAD
-    """Compose the text that gets embedded for a file summary."""
-=======
->>>>>>> ks-str
     key_fns = summary.get("key_functions") or []
     if isinstance(key_fns, list):
         key_fns = ", ".join(key_fns)
@@ -92,16 +60,7 @@ def _doc_string(summary: dict) -> str:
     )
 
 
-<<<<<<< HEAD
-def build_store(index_json_path: str, store_path: str) -> None:
-    """Load index.json and upsert every file summary into ChromaDB.
-
-    Documents are keyed by relative_path so re-running is idempotent.
-    Metadata stored per document: path, relative_path, domain, complexity.
-    """
-=======
 def build_store(index_json_path: str, store_path: str) -> int:
->>>>>>> ks-str
     with open(index_json_path, "r", encoding="utf-8") as f:
         summaries: list[dict] = json.load(f)
 
@@ -127,25 +86,6 @@ def build_store(index_json_path: str, store_path: str) -> int:
             "purpose": summary.get("purpose", ""),
         })
 
-<<<<<<< HEAD
-    if not ids:
-        print("No summaries to store.")
-        return
-
-    # Upsert in one batch; ChromaDB handles adds and updates transparently.
-    collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
-    print(f"Stored {len(ids)} files in vector DB")
-
-
-def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
-    """Semantic search over the codebase collection.
-
-    Returns up to n_results dicts, each with:
-      relative_path, purpose, domain, similarity_score
-
-    similarity_score is 1 - cosine_distance, so 1.0 is a perfect match.
-    """
-=======
     if ids:
         collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
 
@@ -153,7 +93,6 @@ def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
 
 
 def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
->>>>>>> ks-str
     collection = _open_collection(store_path)
 
     result = collection.query(
@@ -163,17 +102,10 @@ def search(query: str, store_path: str, n_results: int = 5) -> list[dict]:
     )
 
     hits = []
-<<<<<<< HEAD
-    metadatas = result.get("metadatas", [[]])[0]
-    distances = result.get("distances", [[]])[0]
-
-    for meta, distance in zip(metadatas, distances):
-=======
     metadatas_list = result.get("metadatas", [[]])[0]
     distances = result.get("distances", [[]])[0]
 
     for meta, distance in zip(metadatas_list, distances):
->>>>>>> ks-str
         hits.append({
             "relative_path": meta.get("relative_path", ""),
             "purpose": meta.get("purpose", ""),

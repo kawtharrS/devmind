@@ -13,10 +13,13 @@ dependencies = [
     "tiktoken",
     "rich",
     "gitpython",
+    "python-dotenv",
+    "mcp",
 ]
 
 [project.scripts]
 devmind = "devmind.cli:cli"
+devmind-mcp = "devmind.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
